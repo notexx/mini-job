@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>调度任务</title>
+</head>
+<script src="https://cdn.jsdelivr.net/npm/vue"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<!-- 引入样式 -->
+<link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+<!-- 引入组件库 -->
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+
+<body>
+<div id="app">
+    <el-form :inline="true" class="demo-form-inline">
+
+        <el-form-item>
+            <el-button type="primary" @click="getJobs">刷新</el-button>
+        </el-form-item>
+
+        <el-form-item>
+            <el-button type="primary" @click="addDialog">新增</el-button>
+        </el-form-item>
+
+        <el-form-item label="任务数量">
+            <el-input v-model="count"></el-input>
+        </el-form-item>
+
+        <el-form-item>
+            <el-button type="primary" @click="batchJob">批量执行</el-button>
+        </el-form-item>
+
+    </el-form>
+    <!-- Form -->
+    <el-dialog title="编辑任务" :visible.sync="dialogFormVisible">
+        <el-form :model="form">
+            <el-form-item label="名称" :label-width="formLabelWidth">
+                <el-input v-model="form.jobName" autocomplete="off"></el-input>
+            </el-form-item>
+            <el-form-item label="类型" :label-width="formLabelWidth">
+                <el-select v-model="form.jobType" placeholder="请选择任务类型">
+                    <el-option label="类型一" value="类型一"></el-option>
+                    <el-option label="类型二" value="类型二"></el-option>
+                    <el-option label="类型三" value="类型三"></el-option>
+                    <el-option label="类型四" value="类型四"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="数据" :label-width="formLabelWidth">
+                <el-input v-model="form.jobData" autocomplete="off"></el-input>
+            </el-form-item>
+
+            <el-form-item label="任务状态" :label-width="formLabelWidth">
+                <el-select v-model="form.status" placeholder="请选择任务状态" :disabled="updateDisable">
+                    <el-option label="新建" value="0" checked></el-option>
+                    <el-option label="立即执行" value="1"></el-option>
+                </el-select>
+            </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogFormVisible = false">取 消</el-button>
+            <el-button type="primary" @click="saveJob">确 定</el-button>
+        </div>
+    </el-dialog>
+
+    <el-table
+            :data="jobs"
+            v-loading="loading"
+            style="width: 100%">
+        <el-table-column
+                type="index"
+                width="50">
+        </el-table-column>
+        <el-table-column
+                label="名称"
+                prop="jobName">
+        </el-table-column>
+        <el-table-column
+                label="任务类型"
+                prop="jobType">
+        </el-table-column>
+        <el-table-column
+                label="执行时间"
+                prop="jobTime">
+        </el-table-column>
+        <el-table-column
+                label="消耗时间(秒)"
+                prop="consumerTime">
+        </el-table-column>
+        <el-table-column
+                label="信息">
+            <template slot-scope="scope">
+                <el-popover trigger="hover" placement="top">
+                    <p>{{ scope.row.jobData }}</p>
+                    <div slot="reference" class="name-wrapper">
+                        <el-tag size="medium">明细</el-tag>
+                    </div>
+                </el-popover>
+            </template>
+        </el-table-column>
+        <el-table-column label="执行通道">
+            <template slot-scope="scope">
+                <span>{{ scope.row.executeChannel}}</span>
+            </template>
+        </el-table-column>
+        <el-table-column label="状态">
+            <template slot-scope="scope">
+                <span>{{ scope.row.status | getStatus}}</span>
+            </template>
+        </el-table-column>
+        <el-table-column align="right">
+            <template slot-scope="scope">
+                <el-button
+                        size="mini"
+                        type="success"
+                        @click="handleExcute(scope.$index, scope.row)" :disabled="scope.row.status !== 0">执行</el-button>
+<!--                <el-button-->
+<!--                        size="mini"-->
+<!--                        @click="handleEdit(scope.$index, scope.row)">编辑</el-button>-->
+                <el-button
+                        size="mini"
+                        type="danger"
+                        @click="handleDelete(scope.$index, scope.row)">删除</el-button>
+            </template>
+        </el-table-column>
+    </el-table>
+
+</div>
+</body>
+
+<script>
+    var vm = new Vue({
+        el: '#app',
+        data: {
+            jobs: [],
+            dialogFormVisible: false,
+            form: {},
+            formLabelWidth: "80px",
+            updateDisable: false,
+            count: 0,
+            currentPage: 1,
+            loading: false
+        },
+        filters: {
+            getStatus: function(val) {
+                if (val === 0)  {
+                    return "新建"
+                }
+                if (val === 1)  {
+                    return "执行完毕"
+                }
+                if (val === 2)  {
+                    return "执行失败"
+                }
+            }
+        },
+        mounted: function() {
+            axios.get('/job/list', {
+                params: {
+                    t: new Date()
+                }
+            })
+            .then(function (response) {
+                vm.jobs = response.data
+            })
+            .catch(function (error) {
+                console.log(error);
+            })
+
+        },
+        methods: {
+            getJobs: function () {
+                vm.loading = true
+                axios.get('/job/list', {
+                    params: {
+                        t: new Date()
+                    }
+                })
+                .then(function (response) {
+                    vm.jobs = response.data
+                    vm.loading = false
+                })
+                .catch(function (error) {
+                    console.log(error);
+                    vm.loading = false
+                })
+                .then(function () {
+                    // always executed
+                });
+            },
+            addDialog: function(idx, row) {
+                vm.updateDisable = false
+                vm.dialogFormVisible = true
+                vm.form = {}
+            },
+            handleEdit: function(idx, row) {
+                vm.updateDisable = true
+                vm.dialogFormVisible = true
+                vm.form = row
+            },
+            handleDelete: function (idx, row) {
+                axios.delete('/job/' + row.id, {
+                })
+                .then(function (response) {
+                    vm.getJobs()
+                })
+            },
+            handleExcute: function (idx, row) {
+                vm.loading = true
+                axios.put('/job/execute/' + row.id)
+                .then(function (response) {
+                    vm.loading = false
+                    vm.getJobs()
+                })
+            },
+            saveJob: function () {
+                vm.loading = true
+                if (vm.form.id == null) {
+                    axios.post('/job', vm.form)
+                    .then(function (response) {
+                       vm.dialogFormVisible = false
+                       vm.getJobs()
+                        vm.loading = false
+                    })
+                    .catch(function (error) {
+                       console.log(error);
+                    })
+                } else {
+                    axios.put('/job/' + vm.form.id, vm.form)
+                    .then(function (response) {
+                        vm.loading = false
+                        vm.dialogFormVisible = false
+                        vm.getJobs()
+                    })
+                    .catch(function (error) {
+                        console.log(error);
+                    })
+               }
+            },
+            batchJob: function () {
+
+                if (vm.count === 0) {
+                    this.$message({
+                        message: '请填写批量任务大小',
+                        type: 'warning'
+                    });
+                    return
+                }
+                vm.loading = true
+                axios.put('/job/execute/batch/' + vm.count)
+                    .then(function (response) {
+                        vm.loading = false
+                        vm.getJobs()
+                    })
+                    .catch(function (error) {
+                        console.log(error);
+                    })
+            }
+        },
+        handleSizeChange: function(val) {
+            console.log("每页 +" + val +"条");
+        },
+        handleCurrentChange: function(val) {
+            console.log("当前页 +" + val);
+        }
+    })
+</script>
+</html>
