@@ -36,7 +36,7 @@ public class SchedulerJobServiceImpl implements SchedulerJobService {
 
     public SchedulerJobServiceImpl() {
         // 默认调用随机权重轮询算法
-        this(LoadBalanceType.CONSISTENT_HASH_LOAD_BALANCE);
+        this(LoadBalanceType.RANDOM_LOAD_BALANCE);
     }
 
     public SchedulerJobServiceImpl(LoadBalanceType type) {
@@ -82,14 +82,11 @@ public class SchedulerJobServiceImpl implements SchedulerJobService {
                 LocalDateTime localDateTime = LocalDateTime.now();
                 String format = localDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
                 // 创建一个模拟任务执行消耗时间
-
                 int finalMockTime = mockTime();
                 String currentChannel = "";
+                // 根据算法获取需要执行的通道
                 if (abstractLoadBalance instanceof ConsistentHashLoadBalance) {
                     currentChannel = abstractLoadBalance.getExecuteChannel(job.getJobType());
-                }
-                if (currentChannel == null) {
-                    System.out.println("=====");
                 }
                 String name = Thread.currentThread().getName();
                 if (StringUtils.isEmpty(job.getId())) {
@@ -136,7 +133,7 @@ public class SchedulerJobServiceImpl implements SchedulerJobService {
             } else if (i % 4 == 3) {
                 job.setJobType("类型四");
             } else {
-                job.setJobType("null");
+                job.setJobType("类型二");
             }
             executeJob(job);
         }
@@ -153,6 +150,10 @@ public class SchedulerJobServiceImpl implements SchedulerJobService {
         return jobService.findAliveJobs();
     }
 
+    /**
+     * 生成模拟业务执行时间
+     * @return
+     */
     private static int mockTime() {
         int mockTime = random.nextInt(500);
         if (mockTime < 100) {

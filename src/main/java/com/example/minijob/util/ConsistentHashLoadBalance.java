@@ -1,7 +1,6 @@
 package com.example.minijob.util;
 
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -19,7 +18,6 @@ public class ConsistentHashLoadBalance extends AbstractLoadBalance {
      * 程序初始化，将所有的服务器放入sortedMap中
      */
     static {
-        int i = 0;
         for (Map.Entry m : ChannelMap.serverWeightMap.entrySet()) {
             int hash = getHash(m.getKey().toString());
             System.out.println("[" + m.getKey().toString() + "]加入集合中, 其Hash值为" + hash);
@@ -60,18 +58,14 @@ public class ConsistentHashLoadBalance extends AbstractLoadBalance {
         // 得到大于该Hash值的所有Map
         SortedMap<Integer, String> subMap =
                 sortedMap.tailMap(hash);
-        // 第一个Key就是顺时针过去离node最近的那个结点
-        Integer i = null;
-        String s = "";
-        try {
-            i = subMap.firstKey();
-            // 返回对应的服务器名称
-            s = subMap.get(i);
-        } catch (NoSuchElementException ex) {
-            // subMap 为空，直接连接到 sortedMap 第一个节点
-            s = sortedMap.get(sortedMap.firstKey());
+        // 没有大于该Hash值的map，直接获取第一个节点
+        if (subMap.size() == 0) {
+            return sortedMap.get(sortedMap.firstKey());
         }
-        return s;
+        // 第一个Key就是顺时针过去离node最近的那个结点
+        Integer i = subMap.firstKey();
+        // 返回对应的服务器名称
+        return subMap.get(i);
     }
 
     @Override
